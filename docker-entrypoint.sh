@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 if [ ! -f "/etc/snell/snell-server.conf" ]; then
         if [ -z "$PSK" ]; then
