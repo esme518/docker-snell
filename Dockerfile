@@ -2,28 +2,41 @@
 # Dockerfile for snell
 #
 
-FROM alpine:latest
+FROM alpine as source
 
-ARG GLIBC_VER="2.34-r0"
-ENV GLIBC_URL https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VER}/glibc-${GLIBC_VER}.apk
-ENV GLIBCBIN_URL https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VER}/glibc-bin-${GLIBC_VER}.apk
-ENV SNELL_URL https://github.com/surge-networks/snell/releases/download/v3.0.1/snell-server-v3.0.1-linux-amd64.zip
+ARG URL=https://api.github.com/repos/sgerrand/alpine-pkg-glibc/releases/48125610
+ARG SNELL_VER=4.0.1
+
+WORKDIR /root
 
 RUN set -ex \
-    && apk add --update --no-cache \
+    && if [ "$(uname -m)" == aarch64 ]; then \
+           export PLATFORM='linux-aarch64'; \
+       elif [ "$(uname -m)" == x86_64 ]; then \
+           export PLATFORM='linux-amd64'; \
+       fi \
+    && export SNELL_URL=https://dl.nssurge.com/snell/snell-server-v${SNELL_VER}-${PLATFORM}.zip \
+    && apk add --update --no-cache curl \
+    && wget -O glibc.apk $(curl -s $URL | grep browser_download_url | egrep -o 'http.+glibc-\d.*\.apk') \
+    && wget -O glibc-bin.apk $(curl -s $URL | grep browser_download_url | egrep -o 'http.+glibc-bin-\d.*\.apk') \
+    && wget -O snell.zip $SNELL_URL \
+    && unzip snell.zip -d /etc/snell \
+    && rm -rf snell.zip
+
+FROM alpine
+COPY --from=source /root/*.apk /root/
+COPY --from=source /etc/snell /etc/snell
+
+WORKDIR /root
+
+RUN set -ex \
+    && wget -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub \
+    && apk add --update --no-cache --force-overwrite \
+        glibc.apk \
+        glibc-bin.apk \
         libstdc++ \
-    && wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub \
-    && wget $GLIBC_URL \
-    && wget $GLIBCBIN_URL \
-    && apk add --no-cache \
-        glibc-${GLIBC_VER}.apk \
-        glibc-bin-${GLIBC_VER}.apk \
-    && rm -rf glibc* \
-    && wget -q -O /snell.zip $SNELL_URL \
-    && mkdir /etc/snell \
-    && unzip /snell.zip -d /etc/snell \
-    && rm -rf /snell.zip \
-    && rm -rf /etc/apk/keys/sgerrand.rsa.pub \
+        tini \
+    && rm -rf *.apk /etc/apk/keys/sgerrand.rsa.pub \
     && rm -rf /var/cache/apk
 
 WORKDIR /etc/snell
@@ -32,13 +45,10 @@ COPY docker-entrypoint.sh /entrypoint.sh
 
 ENV PATH /etc/snell:$PATH
 
-ENV SERVER_PORT 6160
+ENV INTERFACE 0.0.0.0
+ENV PORT 6160
 ENV PSK=
-ENV OBFS http
+ENV IPV6 false
 
-EXPOSE ${SERVER_PORT}/tcp
-EXPOSE ${SERVER_PORT}/udp
-
-ENTRYPOINT ["/entrypoint.sh"]
-
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 CMD ["snell-server", "-c", "snell-server.conf"]

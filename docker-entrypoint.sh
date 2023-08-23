@@ -7,9 +7,9 @@ if [ ! -f "/etc/snell/snell-server.conf" ]; then
         fi
         cat > /etc/snell/snell-server.conf <<EOF
 [snell-server]
-listen = 0.0.0.0:${SERVER_PORT}
+listen = ${INTERFACE}:${PORT}
 psk = ${PSK}
-obfs = ${OBFS}
+ipv6 = ${IPV6}
 EOF
         cat /etc/snell/snell-server.conf
 fi
