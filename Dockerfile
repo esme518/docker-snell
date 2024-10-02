@@ -2,9 +2,9 @@
 # Dockerfile for snell
 #
 
-FROM alpine as source
+FROM alpine AS source
 
-ARG SNELL_VER=4.0.1
+ARG SNELL_VER=4.1.1
 
 WORKDIR /root
 
@@ -28,16 +28,16 @@ RUN set -ex \
     && apk add --update --no-cache \
         libstdc++ \
         tini \
-    && chown -R nonroot.nonroot /etc/snell \
+    && chown -R nonroot:nonroot /etc/snell \
     && rm -rf /tmp/* /var/cache/apk/*
 
 WORKDIR /etc/snell
-ENV PATH /etc/snell:$PATH
+ENV PATH=/etc/snell:$PATH
 
-ENV INTERFACE 0.0.0.0
-ENV PORT 6160
+ENV INTERFACE=0.0.0.0
+ENV PORT=6160
 ENV PSK=
-ENV IPV6 false
+ENV IPV6=false
 
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 CMD ["snell-server", "-c", "snell-server.conf"]
